@@ -50,9 +50,9 @@ void removeEntityFromQueue(const std::string &filePath, const std::string &photo
 
     // Find and display the entity
     auto it = std::find_if(queueData.begin(), queueData.end(), [&](const json &entry)
-                           {
-                               return entry["photobooth_id"] == photoboothId; // Assuming session_id is unique
-                           });
+    {
+        return entry["photobooth_id"] == photoboothId; // Assuming session_id is unique
+    });
 
     if (it != queueData.end())
     {
@@ -86,27 +86,32 @@ void uploadImageToFirebase(const std::string &filePath)
     //     // Handle success or failure
     //     OutputDebugString(L"Image uploaded successfully.\n");
     // });
-        std::cout << "Media removed successfully.\n";
+    std::cout << "Media uploaded successfully.\n";
 }
 
-void backgroundUploadTask()
+void backgroundUploadTask(const std::string &documentDirPath)
 {
+    std::cout << "Starting thread with document directory " << documentDirPath << std::endl;
+    fs::path documentsPath = fs::path(documentDirPath);
+
+    std::string settingFilePath = (documentsPath / "photobooth_data.json").string();
+    json settingsData = readJsonFromFile(settingFilePath);
+
+    std::string photosPath = settingsData["fileDownloadLocation"];
+
+    std::cout << "Collecting Photos from " << photosPath << std::endl;
+
+    std::string queuePath = (documentsPath / "upload_queue.json").string();
+
+    int i = 0;
     while (true)
     {
+        std::cerr << "Executing# " << ++i << std::endl;
         try
         {
-            fs::path documentsPath = fs::path(std::getenv("HOME")) / "Documents";
-
-            std::string settingFilePath = (documentsPath / "photobooth_data.json").string();
-            json settingsData = readJsonFromFile(settingFilePath);
-
-            std::string photosPath = settingsData["fileDownloadLocation"];
-            std::cout << "File Download Location: " << photosPath << std::endl;
-
-            std::string queuePath = (documentsPath / "upload_queue.json").string();
             json queueData = readJsonFromFile(queuePath);
 
-            std::cout << "Queue Data: " << queueData << std::endl;
+            std::cout << queueData.size() << " media items founded." << std::endl;
 
             for (const auto &entry : queueData)
             {
@@ -129,10 +134,18 @@ void backgroundUploadTask()
 
 int main()
 {
-    std::thread uploadThread(backgroundUploadTask);
-    uploadThread.detach();
+    std::thread uploadThread(backgroundUploadTask, "C:\\Users\\Muhammad Hassan\\OneDrive\\Documents");
+    if (uploadThread.joinable())
+    {
+        uploadThread.detach();
+    }
+    else
+    {
+        std::cerr << "Failed to create upload thread." << std::endl;
+    }
 
-    while(true) {
+    while (true)
+    {
         std::this_thread::sleep_for(std::chrono::minutes(1));
     }
     return 0;

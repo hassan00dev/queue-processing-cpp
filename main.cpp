@@ -2,6 +2,7 @@
 #include <fstream>
 #include <filesystem>
 #include "libs/json.hpp"
+#include <thread>
 
 // Namespace for convenience
 using json = nlohmann::json;
@@ -73,33 +74,62 @@ void removeEntityFromQueue(const std::string &filePath, const std::string &photo
     }
 }
 
+void uploadImageToFirebase(const std::string &filePath)
+{
+    std::cout << "Uploading media (" << filePath << ") to firebase storage.\n";
+    // // Initialize Firebase storage
+    // firebase::storage::StorageReference storageRef = firebase::storage::StorageReference();
+
+    // // Upload file to Firebase Storage
+    // // This part of the code depends on the Firebase SDK for Windows
+    // storageRef.PutFile(filePath.c_str(), "uploads/my_image.jpg", [](firebase::storage::StorageReference& ref, firebase::storage::Metadata metadata) {
+    //     // Handle success or failure
+    //     OutputDebugString(L"Image uploaded successfully.\n");
+    // });
+        std::cout << "Media removed successfully.\n";
+}
+
+void backgroundUploadTask()
+{
+    while (true)
+    {
+        try
+        {
+            fs::path documentsPath = fs::path(std::getenv("HOME")) / "Documents";
+
+            std::string settingFilePath = (documentsPath / "photobooth_data.json").string();
+            json settingsData = readJsonFromFile(settingFilePath);
+
+            std::string photosPath = settingsData["fileDownloadLocation"];
+            std::cout << "File Download Location: " << photosPath << std::endl;
+
+            std::string queuePath = (documentsPath / "upload_queue.json").string();
+            json queueData = readJsonFromFile(queuePath);
+
+            std::cout << "Queue Data: " << queueData << std::endl;
+
+            for (const auto &entry : queueData)
+            {
+                std::string photoboothId = displayEntity(entry);
+                std::string mediaFilePath = entry["url"];
+
+                uploadImageToFirebase(mediaFilePath);
+
+                removeEntityFromQueue(queuePath, photoboothId);
+            }
+        }
+        catch (const std::exception &ex)
+        {
+            std::cerr << "Error: " << ex.what() << std::endl;
+        }
+
+        std::this_thread::sleep_for(std::chrono::seconds(30));
+    }
+}
+
 int main()
 {
-    try
-    {
-        fs::path documentsPath = fs::path(std::getenv("HOME")) / "Documents";
-
-        std::string settingFilePath = (documentsPath / "photobooth_data.json").string();
-        json settingsData = readJsonFromFile(settingFilePath);
-
-        std::string photosPath = settingsData["fileDownloadLocation"];
-        std::cout << "File Download Location: " << photosPath << std::endl;
-
-        std::string queuePath = (documentsPath / "upload_queue.json").string();
-        json queueData = readJsonFromFile(queuePath);
-
-        std::cout << "Queue Data: " << queueData << std::endl;
-
-        for (const auto &entry : queueData)
-        {
-            std::string photoboothId = displayEntity(entry);
-            removeEntityFromQueue(queuePath, photoboothId);
-        }
-    }
-    catch (const std::exception &ex)
-    {
-        std::cerr << "Error: " << ex.what() << std::endl;
-    }
-
+    std::thread uploadThread(backgroundUploadTask);
+    uploadThread.join();
     return 0;
 }

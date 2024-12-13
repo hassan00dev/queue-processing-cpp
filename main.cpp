@@ -21,7 +21,7 @@ json readJsonFromFile(const std::string &filePath)
     return jsonData;
 }
 
-void displayEntity(const json &entity)
+std::string displayEntity(const json &entity)
 {
     std::cout << "Client ID: " << entity["client_id"] << std::endl;
     std::cout << "Photobooth ID: " << entity["photobooth_id"] << std::endl;
@@ -31,6 +31,46 @@ void displayEntity(const json &entity)
     std::cout << "Media Type: " << entity["media_type"] << std::endl;
     std::cout << "Approval Status: " << entity["approval_status"] << std::endl;
     std::cout << std::endl;
+
+    return entity["photobooth_id"];
+}
+
+void removeEntityFromQueue(const std::string &filePath, const std::string &photoboothId)
+{
+    std::ifstream inputFile(filePath);
+    if (!inputFile.is_open())
+    {
+        throw std::runtime_error("Could not open the JSON file.");
+    }
+
+    json queueData;
+    inputFile >> queueData;
+    inputFile.close();
+
+    // Find and display the entity
+    auto it = std::find_if(queueData.begin(), queueData.end(), [&](const json &entry)
+                           {
+                               return entry["photobooth_id"] == photoboothId; // Assuming session_id is unique
+                           });
+
+    if (it != queueData.end())
+    {
+        queueData.erase(it);
+
+        std::ofstream outputFile(filePath);
+        if (!outputFile.is_open())
+        {
+            throw std::runtime_error("Could not open the JSON file for writing.");
+        }
+        outputFile << queueData.dump(4);
+        outputFile.close();
+
+        std::cout << "Entity removed successfully.\n";
+    }
+    else
+    {
+        std::cout << "Entity with session ID " << photoboothId << " not found.\n";
+    }
 }
 
 int main()
@@ -52,7 +92,8 @@ int main()
 
         for (const auto &entry : queueData)
         {
-            displayEntity(entry);
+            std::string photoboothId = displayEntity(entry);
+            removeEntityFromQueue(queuePath, photoboothId);
         }
     }
     catch (const std::exception &ex)

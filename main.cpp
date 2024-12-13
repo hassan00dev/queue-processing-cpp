@@ -130,6 +130,10 @@ void backgroundUploadTask()
 int main()
 {
     std::thread uploadThread(backgroundUploadTask);
-    uploadThread.join();
+    uploadThread.detach();
+
+    while(true) {
+        std::this_thread::sleep_for(std::chrono::minutes(1));
+    }
     return 0;
 }
